@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{heading}}</title>
+  <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:40px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Main Card -->
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+
+          <!-- ═══════ Header ═══════ -->
+          <tr>
+            <td style="background:linear-gradient(135deg, {{#if headingColor}}{{headingColor}}{{else}}#0ea5e9{{/if}} 0%, {{#if headingColorEnd}}{{headingColorEnd}}{{else}}#6366f1{{/if}} 100%);padding:36px 40px;text-align:center;">
+              {{#if icon}}
+              <div style="font-size:44px;line-height:1;margin-bottom:14px;">{{icon}}</div>
+              {{/if}}
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;line-height:1.3;">{{heading}}</h1>
+            </td>
+          </tr>
+
+          <!-- ═══════ Body ═══════ -->
+          <tr>
+            <td style="padding:32px 40px 36px;">
+
+              {{#if name}}
+              <p style="margin:0 0 20px;font-size:16px;color:#1e293b;font-weight:600;">Hi {{name}},</p>
+              {{/if}}
+
+              {{#each paragraphs}}
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#475569;">{{{this}}}</p>
+              {{/each}}
+
+              {{#if rawHtml}}
+              <div style="margin:16px 0;font-size:15px;line-height:1.7;color:#475569;">{{{rawHtml}}}</div>
+              {{/if}}
+
+              {{#if highlight}}
+              <div style="margin:24px 0;padding:16px 20px;background-color:#f8fafc;border-left:4px solid {{#if headingColor}}{{headingColor}}{{else}}#0ea5e9{{/if}};border-radius:0 8px 8px 0;">
+                <p style="margin:0;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:1px;font-family:'Courier New',monospace;">{{highlight}}</p>
+              </div>
+              {{/if}}
+
+              {{#if details}}
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:24px 0;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+                {{#each details}}
+                <tr{{#unless @last}} style="border-bottom:1px solid #f1f5f9;"{{/unless}}>
+                  <td style="padding:12px 16px;font-size:13px;color:#64748b;background-color:#f8fafc;width:40%;font-weight:600;">{{this.label}}</td>
+                  <td style="padding:12px 16px;font-size:14px;color:#0f172a;font-weight:600;">{{this.value}}</td>
+                </tr>
+                {{/each}}
+              </table>
+              {{/if}}
+
+              {{#if buttonText}}
+              <div style="text-align:center;margin:28px 0 8px;">
+                <a href="{{buttonUrl}}" target="_blank" style="display:inline-block;padding:14px 36px;background-color:{{#if buttonColor}}{{buttonColor}}{{else}}#0ea5e9{{/if}};color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+                  {{buttonText}}
+                </a>
+              </div>
+              {{/if}}
+
+              {{#if footerNote}}
+              <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.5;">{{footerNote}}</p>
+              {{/if}}
+
+            </td>
+          </tr>
+
+          <!-- ═══════ Footer ═══════ -->
+          <tr>
+            <td style="padding:24px 40px;background-color:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+              <p style="margin:0;font-size:13px;color:#64748b;">Best regards,</p>
+              <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#334155;">The Digital Directory Team</p>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Copyright -->
+        <p style="margin:24px 0 0;font-size:11px;color:#94a3b8;text-align:center;">
+          &copy; {{year}} Digital Directory. All rights reserved.
+        </p>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

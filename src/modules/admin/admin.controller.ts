@@ -382,6 +382,15 @@ export class AdminController extends BaseController {
     return this.handleAsyncOperation(this.adminService.getAnalytics(countryId));
   }
 
+  @Get('recent-activity')
+  @ApiOperation({ summary: 'Get recent audit log activity for dashboard' })
+  @ApiResponse({ status: 200, description: 'Recent activity retrieved' })
+  getRecentActivity() {
+    return this.handleAsyncOperation(
+      this.auditLogsService.findAll({ page: 1, limit: 10 }),
+    );
+  }
+
   @Get('analytics/revenue')
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(30000)

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -37,30 +42,41 @@ export class AdminService {
   ) {}
 
   async approveBusiness(id: string): Promise<ServiceResponse<Business>> {
-    const business = await this.businessRepository.findOne({ where: { id }, relations: ['user'] });
+    const business = await this.businessRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
     if (!business) throw new NotFoundException('Business not found');
 
     business.isApproved = true;
     business.rejectionReason = null;
     const saved = await this.businessRepository.save(business);
     if (business.user?.email) {
-      await this.notificationsService.sendEmail(
-        'listing-approved',
-        business.user.email,
-        'Your business has been approved!',
-        {
-          recipientName: business.user?.name || 'Business Owner',
-          businessName: business.name,
-          listingUrl: `${process.env.FRONTEND_URLS?.split(',')[0] || ''}/business/${business.id}`,
-        },
-      ).catch(() => {});
+      await this.notificationsService
+        .sendEmail(
+          'listing-approved',
+          business.user.email,
+          'Your business has been approved!',
+          {
+            recipientName: business.user?.name || 'Business Owner',
+            businessName: business.name,
+            listingUrl: `${process.env.FRONTEND_URLS?.split(',')[0] || ''}/business/${business.id}`,
+          },
+        )
+        .catch(() => {});
     }
 
     return { success: true, message: 'Business approved', data: saved };
   }
 
-  async rejectBusiness(id: string, reason: string): Promise<ServiceResponse<Business>> {
-    const business = await this.businessRepository.findOne({ where: { id }, relations: ['user'] });
+  async rejectBusiness(
+    id: string,
+    reason: string,
+  ): Promise<ServiceResponse<Business>> {
+    const business = await this.businessRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
     if (!business) throw new NotFoundException('Business not found');
 
     business.isApproved = false;
@@ -69,17 +85,19 @@ export class AdminService {
 
     // Send rejection notification
     if (business.user?.email) {
-      await this.notificationsService.sendEmail(
-        'listing-rejected',
-        business.user.email,
-        'Business listing rejected',
-        {
-          subject: 'Business Listing Rejected',
-          recipientName: business.user?.name || 'Business Owner',
-          businessName: business.name,
-          reason,
-        },
-      ).catch(() => {});
+      await this.notificationsService
+        .sendEmail(
+          'listing-rejected',
+          business.user.email,
+          'Business listing rejected',
+          {
+            subject: 'Business Listing Rejected',
+            recipientName: business.user?.name || 'Business Owner',
+            businessName: business.name,
+            reason,
+          },
+        )
+        .catch(() => {});
     }
 
     return { success: true, message: 'Business rejected', data: saved };
@@ -106,7 +124,10 @@ export class AdminService {
   }
 
   async suspendUser(id: string): Promise<ServiceResponse<void>> {
-    const user = await this.userRepository.findOne({ where: { id }, relations: ['role'] });
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['role'],
+    });
     if (!user) throw new NotFoundException('User not found');
 
     if (user.role?.name === 'admin' || user.role?.name === 'super_admin') {
@@ -143,7 +164,9 @@ export class AdminService {
 
     // Cascade cleanup: delete related data in the correct order
     // 1. Find user's businesses
-    const businesses = await this.businessRepository.find({ where: { userId: id } });
+    const businesses = await this.businessRepository.find({
+      where: { userId: id },
+    });
     if (businesses.length > 0) {
       const businessIds = businesses.map((e) => e.id);
 
@@ -207,22 +230,21 @@ export class AdminService {
     await this.userRepository.update(userId, { passwordHash: hashed });
 
     // Revoke all refresh tokens so user must re-login
-    await this.refreshTokenRepository.update(
-      { userId },
-      { isRevoked: true },
-    );
+    await this.refreshTokenRepository.update({ userId }, { isRevoked: true });
 
     // Send notification email with admin-specific template
-    await this.notificationsService.sendEmail(
-      'admin-password-reset',
-      user.email,
-      'Your password has been reset',
-      {
-        name: user.name || user.email,
-        tempPassword: newPassword ? undefined : password,
-      },
-      userId,
-    ).catch(() => {});
+    await this.notificationsService
+      .sendEmail(
+        'admin-password-reset',
+        user.email,
+        'Your password has been reset',
+        {
+          name: user.name || user.email,
+          tempPassword: newPassword ? undefined : password,
+        },
+        userId,
+      )
+      .catch(() => {});
 
     this.logger.log(`Password reset by admin for user: ${user.email}`);
 
@@ -242,12 +264,24 @@ export class AdminService {
       totalUsers,
       totalBusinesses,
       approvedBusinesses,
+      pendingApprovals,
       activeSubscriptions,
       totalRevenue,
+      totalReviews,
+      totalPayments,
     ] = await Promise.all([
       this.userRepository.count(),
       this.businessRepository.count({ where: businessWhere }),
-      this.businessRepository.count({ where: { ...businessWhere, isApproved: true } }),
+      this.businessRepository.count({
+        where: { ...businessWhere, isApproved: true },
+      }),
+      this.businessRepository.count({
+        where: {
+          ...businessWhere,
+          isApproved: false,
+          rejectionReason: null as any,
+        },
+      }),
       countryId
         ? this.subscriptionRepository
             .createQueryBuilder('s')
@@ -255,7 +289,9 @@ export class AdminService {
             .andWhere('s.status = :activeStatus', { activeStatus: 'active' })
             .andWhere('e.country_id = :countryId', { countryId })
             .getCount()
-        : this.subscriptionRepository.count({ where: { status: 'active' as any } }),
+        : this.subscriptionRepository.count({
+            where: { status: 'active' as any },
+          }),
       countryId
         ? this.paymentRepository
             .createQueryBuilder('payment')
@@ -270,6 +306,8 @@ export class AdminService {
             .select('COALESCE(SUM(payment.amount), 0)', 'total')
             .where('payment.status = :status', { status: 'success' })
             .getRawOne(),
+      this.reviewRepository.count(),
+      this.paymentRepository.count(),
     ]);
 
     // Country breakdown (always include)
@@ -279,11 +317,35 @@ export class AdminService {
       .select('e.country_id', 'countryId')
       .addSelect('c.name', 'countryName')
       .addSelect('COUNT(e.id)', 'total')
-      .addSelect('SUM(CASE WHEN e.is_approved = true THEN 1 ELSE 0 END)', 'approved')
-      .addSelect('SUM(CASE WHEN e.is_active = true THEN 1 ELSE 0 END)', 'active')
+      .addSelect(
+        'SUM(CASE WHEN e.is_approved = true THEN 1 ELSE 0 END)',
+        'approved',
+      )
+      .addSelect(
+        'SUM(CASE WHEN e.is_active = true THEN 1 ELSE 0 END)',
+        'active',
+      )
       .groupBy('e.country_id')
       .addGroupBy('c.name')
       .getRawMany();
+
+    // Revenue by country
+    const revenueByCountryRaw = await this.paymentRepository
+      .createQueryBuilder('payment')
+      .innerJoin('subscriptions', 's', 's.id = payment.subscription_id')
+      .innerJoin('businesses', 'e', 'e.id = s.business_id')
+      .innerJoin('countries', 'c', 'c.id = e.country_id')
+      .select('c.name', 'country')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'revenue')
+      .where('payment.status = :status', { status: 'success' })
+      .groupBy('c.name')
+      .orderBy('COALESCE(SUM(payment.amount), 0)', 'DESC')
+      .getRawMany();
+
+    const revenueByCountry: Record<string, number> = {};
+    for (const row of revenueByCountryRaw) {
+      revenueByCountry[row.country] = parseFloat(row.revenue || '0');
+    }
 
     // Subscription conversion rate
     const approvedCount = approvedBusinesses || 1;
@@ -298,10 +360,14 @@ export class AdminService {
         totalUsers,
         totalBusinesses,
         approvedBusinesses,
+        pendingApprovals,
         activeSubscriptions,
         totalRevenue: parseFloat(totalRevenue?.total || '0'),
+        totalReviews,
+        totalPayments,
         subscriptionConversionRate,
         businessesByCountry,
+        revenueByCountry,
       },
     };
   }
@@ -331,8 +397,10 @@ export class AdminService {
       qb.andWhere('payment.created_at <= :endDate', { endDate });
     }
 
-    qb.groupBy("DATE_TRUNC('month', payment.created_at)")
-      .orderBy("DATE_TRUNC('month', payment.created_at)", 'ASC');
+    qb.groupBy("DATE_TRUNC('month', payment.created_at)").orderBy(
+      "DATE_TRUNC('month', payment.created_at)",
+      'ASC',
+    );
 
     const monthlyData = await qb.getRawMany();
 
@@ -379,7 +447,10 @@ export class AdminService {
         select: ['id', 'userId'],
       });
 
-      const ownerMap = new Map<string, { id: string; email: string; name: string }>();
+      const ownerMap = new Map<
+        string,
+        { id: string; email: string; name: string }
+      >();
       for (const e of businesses) {
         if (e.user && e.user.isActive && !ownerMap.has(e.user.id)) {
           ownerMap.set(e.user.id, {
@@ -441,11 +512,16 @@ export class AdminService {
       qb.andWhere('payment.status = :status', { status: query.status });
     }
     if (query?.countryId) {
-      qb.innerJoin('businesses', 'biz', 'biz.id = subscription.business_id')
-        .andWhere('biz.country_id = :countryId', { countryId: query.countryId });
+      qb.innerJoin(
+        'businesses',
+        'biz',
+        'biz.id = subscription.business_id',
+      ).andWhere('biz.country_id = :countryId', { countryId: query.countryId });
     }
     if (query?.dateFrom) {
-      qb.andWhere('payment.created_at >= :dateFrom', { dateFrom: query.dateFrom });
+      qb.andWhere('payment.created_at >= :dateFrom', {
+        dateFrom: query.dateFrom,
+      });
     }
     if (query?.dateTo) {
       qb.andWhere('payment.created_at <= :dateTo', { dateTo: query.dateTo });
@@ -456,7 +532,12 @@ export class AdminService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { success: true, message: 'Payments retrieved', data, meta: { total, page, limit } };
+    return {
+      success: true,
+      message: 'Payments retrieved',
+      data,
+      meta: { total, page, limit },
+    };
   }
 
   async listSubscriptions(query?: {
@@ -478,7 +559,9 @@ export class AdminService {
       qb.andWhere('subscription.status = :status', { status: query.status });
     }
     if (query?.countryId) {
-      qb.andWhere('business.countryId = :countryId', { countryId: query.countryId });
+      qb.andWhere('business.countryId = :countryId', {
+        countryId: query.countryId,
+      });
     }
 
     qb.orderBy('subscription.createdAt', 'DESC')
@@ -486,7 +569,12 @@ export class AdminService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { success: true, message: 'Subscriptions retrieved', data, meta: { total, page, limit } };
+    return {
+      success: true,
+      message: 'Subscriptions retrieved',
+      data,
+      meta: { total, page, limit },
+    };
   }
 
   async getBusinessDetail(id: string): Promise<ServiceResponse<Business>> {
@@ -507,7 +595,11 @@ export class AdminService {
       ],
     });
     if (!business) throw new NotFoundException('Business not found');
-    return { success: true, message: 'Business detail retrieved', data: business };
+    return {
+      success: true,
+      message: 'Business detail retrieved',
+      data: business,
+    };
   }
 
   async listBusinesses(query?: {
@@ -531,7 +623,12 @@ export class AdminService {
       take: limit,
     });
 
-    return { success: true, message: 'Businesses retrieved', data, meta: { total, page, limit } };
+    return {
+      success: true,
+      message: 'Businesses retrieved',
+      data,
+      meta: { total, page, limit },
+    };
   }
 
   async listUsers(query?: {
@@ -547,15 +644,20 @@ export class AdminService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .select([
-        'user.id', 'user.email', 'user.name', 'user.isActive',
-        'user.isVerified', 'user.createdAt', 'role.id', 'role.name',
+        'user.id',
+        'user.email',
+        'user.name',
+        'user.isActive',
+        'user.isVerified',
+        'user.createdAt',
+        'role.id',
+        'role.name',
       ]);
 
     if (query?.search) {
-      qb.andWhere(
-        '(user.email ILIKE :search OR user.name ILIKE :search)',
-        { search: `%${query.search}%` },
-      );
+      qb.andWhere('(user.email ILIKE :search OR user.name ILIKE :search)', {
+        search: `%${query.search}%`,
+      });
     }
     if (query?.isActive !== undefined) {
       qb.andWhere('user.isActive = :isActive', { isActive: query.isActive });
@@ -566,7 +668,12 @@ export class AdminService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { success: true, message: 'Users retrieved', data, meta: { total, page, limit } };
+    return {
+      success: true,
+      message: 'Users retrieved',
+      data,
+      meta: { total, page, limit },
+    };
   }
 
   async listReviews(query?: {
@@ -588,18 +695,28 @@ export class AdminService {
       take: limit,
     });
 
-    return { success: true, message: 'Reviews retrieved', data, meta: { total, page, limit } };
+    return {
+      success: true,
+      message: 'Reviews retrieved',
+      data,
+      meta: { total, page, limit },
+    };
   }
 
   // --- Subscription Plans CRUD ---
 
-  async createPlan(dto: Partial<SubscriptionPlan>): Promise<ServiceResponse<SubscriptionPlan>> {
+  async createPlan(
+    dto: Partial<SubscriptionPlan>,
+  ): Promise<ServiceResponse<SubscriptionPlan>> {
     const plan = this.planRepository.create(dto);
     const saved = await this.planRepository.save(plan);
     return { success: true, message: 'Plan created', data: saved };
   }
 
-  async getAllPlans(page?: number, limit?: number): Promise<ServiceResponse<SubscriptionPlan[]>> {
+  async getAllPlans(
+    page?: number,
+    limit?: number,
+  ): Promise<ServiceResponse<SubscriptionPlan[]>> {
     const p = Math.max(1, page || 1);
     const l = Math.min(100, Math.max(1, limit || 20));
     const [data, total] = await this.planRepository.findAndCount({
@@ -607,10 +724,18 @@ export class AdminService {
       skip: (p - 1) * l,
       take: l,
     });
-    return { success: true, message: 'Plans retrieved', data, meta: { total, page: p, limit: l } };
+    return {
+      success: true,
+      message: 'Plans retrieved',
+      data,
+      meta: { total, page: p, limit: l },
+    };
   }
 
-  async updatePlan(id: string, dto: Partial<SubscriptionPlan>): Promise<ServiceResponse<SubscriptionPlan>> {
+  async updatePlan(
+    id: string,
+    dto: Partial<SubscriptionPlan>,
+  ): Promise<ServiceResponse<SubscriptionPlan>> {
     const plan = await this.planRepository.findOne({ where: { id } });
     if (!plan) throw new NotFoundException('Plan not found');
     Object.assign(plan, dto);
